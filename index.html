@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Virtual kiyim kiyish</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+  :root {
+    --bg: var(--tg-theme-bg-color, #ffffff);
+    --text: var(--tg-theme-text-color, #1c1c1e);
+    --hint: var(--tg-theme-hint-color, #8e8e93);
+    --card: var(--tg-theme-secondary-bg-color, #f2f2f7);
+    --btn: var(--tg-theme-button-color, #2481cc);
+    --btn-text: var(--tg-theme-button-text-color, #ffffff);
+  }
+  * { box-sizing: border-box; margin: 0; -webkit-tap-highlight-color: transparent; }
+  body {
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg); color: var(--text);
+    padding: 16px 16px calc(24px + env(safe-area-inset-bottom, 0px));
+    max-width: 520px; margin: 0 auto;
+  }
+  h1 { font-size: 20px; font-weight: 650; margin-bottom: 4px; }
+  p.sub { color: var(--hint); font-size: 14px; margin-bottom: 16px; line-height: 1.4; }
+  .slots { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .slot {
+    position: relative; aspect-ratio: 3 / 4; border-radius: 14px; background: var(--card);
+    overflow: hidden; display: flex; flex-direction: column; align-items: center;
+    justify-content: center; gap: 6px; text-align: center; color: var(--hint);
+    font-size: 14px; cursor: pointer; border: 2px dashed transparent;
+  }
+  .slot.empty { border-color: var(--hint); }
+  .slot strong { color: var(--text); font-size: 15px; }
+  .slot img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+  .slot input { display: none; }
+  button {
+    width: 100%; margin-top: 16px; padding: 14px; border: 0; border-radius: 12px;
+    background: var(--btn); color: var(--btn-text); font-size: 16px; font-weight: 600; cursor: pointer;
+  }
+  button.ghost { background: var(--card); color: var(--text); margin-top: 10px; }
+  button:disabled { opacity: .45; }
+  #status { margin-top: 16px; text-align: center; color: var(--hint); font-size: 14px; min-height: 20px; }
+  #status.err { color: #d93025; }
+  #result { display: none; margin-top: 16px; }
+  #result img { width: 100%; border-radius: 14px; display: block; }
+  @media (prefers-reduced-motion: no-preference) {
+    .spin { display: inline-block; animation: s 1.2s linear infinite; }
+    @keyframes s { to { transform: rotate(360deg); } }
+  }
+</style>
+</head>
+<body>
+  <h1>Virtual kiyim kiyish</h1>
+  <p class="sub">Kiyim va o'zingizning rasmingizni tanlang, natija bir necha soniyada tayyor bo'ladi.</p>
+
+  <div class="slots">
+    <label class="slot empty" id="slotCloth"><strong>Kiyim</strong><span>Rasm tanlash</span>
+      <input type="file" accept="image/*" id="fileCloth"></label>
+    <label class="slot empty" id="slotPerson"><strong>Siz</strong><span>Rasm tanlash</span>
+      <input type="file" accept="image/*" id="filePerson"></label>
+  </div>
+
+  <button id="go" disabled>Kiyib ko'rish</button>
+  <div id="status"></div>
+
+  <div id="result">
+    <img id="resultImg" alt="Natija">
+    <button id="send">Chatga yuborish</button>
+    <button class="ghost" id="again">Boshqa kiyim bilan</button>
+  </div>
+
+<script>
+// ---- Sozlamalar -----------------------------------------------------------
+const BASE_URL = "https://weshopai-weshopai-virtual-try-on.hf.space";
+const FN_INDEX = 2;
+const TRIGGER_ID = 18;
+const RESULT_TIMEOUT_MS = 180000;
+const MAX_SIDE = 1024; // yuklashdan oldin rasmni shu o'lchamgacha kichraytiramiz
+
+const tg = window.Telegram.WebApp;
+tg.ready(); tg.expand();
+const WATERMARK = new URLSearchParams(location.search).get("wm") || "";
+
+const $ = (id) => document.getElementById(id);
+const files = { cloth: null, person: null };
+let resultUrl = null;
+
+// ---- Rasm tanlash ---------------------------------------------------------
+function bindSlot(key, inputId, slotId) {
+  $(inputId).addEventListener("change", (e) => {
+    const f = e.target.files[0];
+    if (!f) return;
+    files[key] = f;
+    const slot = $(slotId);
+    slot.classList.remove("empty");
+    slot.querySelector("img")?.remove();
+    const img = document.createElement("img");
+    img.src = URL.createObjectURL(f);
+    slot.appendChild(img);
+    $("go").disabled = !(files.cloth && files.person);
+  });
+}
+bindSlot("cloth", "fileCloth", "slotCloth");
+bindSlot("person", "filePerson", "slotPerson");
+
+// ---- Yordamchi funksiyalar -----------------------------------------------
+function setStatus(text, isError = false) {
+  const el = $("status");
+  el.className = isError ? "err" : "";
+  el.innerHTML = text;
+}
+
+async function shrink(file) {
+  const bmp = await createImageBitmap(file);
+  const k = Math.min(1, MAX_SIDE / Math.max(bmp.width, bmp.height));
+  const c = document.createElement("canvas");
+  c.width = Math.round(bmp.width * k);
+  c.height = Math.round(bmp.height * k);
+  c.getContext("2d").drawImage(bmp, 0, 0, c.width, c.height);
+  return new Promise((res) => c.toBlob(res, "image/jpeg", 0.92));
+}
+
+async function upload(blob, name) {
+  const form = new FormData();
+  form.append("files", blob, name);
+  const r = await fetch(`${BASE_URL}/gradio_api/upload`, { method: "POST", body: form });
+  if (!r.ok) throw new Error(`Yuklashda xatolik: ${r.status}`);
+  const path = (await r.json())[0];
+  return {
+    path, url: `${BASE_URL}/gradio_api/file=${path}`,
+    orig_name: name, meta: { _type: "gradio.FileData" },
+  };
+}
+
+async function joinQueue(cloth, person, hash) {
+  const r = await fetch(`${BASE_URL}/gradio_api/queue/join`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      data: [cloth, person, null], event_data: null,
+      fn_index: FN_INDEX, trigger_id: TRIGGER_ID, session_hash: hash,
+    }),
+  });
+  if (!r.ok) throw new Error(`Navbatga qo'shilishda xatolik: ${r.status}`);
+}
+
+function waitForResult(hash) {
+  return new Promise((resolve, reject) => {
+    const es = new EventSource(`${BASE_URL}/gradio_api/queue/data?session_hash=${hash}`);
+    const timer = setTimeout(() => { es.close(); reject(new Error("Server javob berishga ko'p vaqt ketdi")); }, RESULT_TIMEOUT_MS);
+    const done = (fn, v) => { clearTimeout(timer); es.close(); fn(v); };
+
+    es.onmessage = (ev) => {
+      let d; try { d = JSON.parse(ev.data); } catch { return; }
+      if (d.msg === "estimation" && d.rank !== undefined) {
+        setStatus(`<span class="spin">⏳</span> Navbatda: ${d.rank + 1}-o'rin`);
+      } else if (d.msg === "process_starts") {
+        setStatus(`<span class="spin">⏳</span> Natija tayyorlanmoqda…`);
+      } else if (d.msg === "process_completed") {
+        const out = d.output || {};
+        if (out.success === false) return done(reject, new Error(out.error || "Server xatoligi"));
+        const item = Array.isArray(out.data) ? out.data[0] : null;
+        if (!item) return done(reject, new Error("Model natija bera olmadi. Boshqa rasmlar bilan urinib ko'ring"));
+        done(resolve, typeof item === "string" ? item : item.url);
+      } else if (d.msg === "process_error" || d.msg === "unexpected_error") {
+        done(reject, new Error("Server xatolik qaytardi"));
+      }
+    };
+    es.onerror = () => { /* EventSource o'zi qayta ulanadi; timeout hal qiladi */ };
+  });
+}
+
+// Natijaga pechat (watermark) bosish
+async function withWatermark(url) {
+  try {
+    const blob = await (await fetch(url)).blob();
+    const bmp = await createImageBitmap(blob);
+    const c = document.createElement("canvas");
+    c.width = bmp.width; c.height = bmp.height;
+    const g = c.getContext("2d");
+    g.drawImage(bmp, 0, 0);
+    if (WATERMARK) {
+      const size = Math.max(16, Math.round(c.width / 28));
+      g.font = `700 ${size}px sans-serif`;
+      const w = g.measureText(WATERMARK).width;
+      const m = Math.max(10, c.width * 0.025);
+      g.fillStyle = "rgba(0,0,0,.47)";
+      g.fillRect(c.width - w - m - 12, c.height - size - m - 8, w + 24, size + 20);
+      g.fillStyle = "rgba(255,255,255,.92)";
+      g.textBaseline = "top";
+      g.fillText(WATERMARK, c.width - w - m, c.height - size - m);
+    }
+    return c.toDataURL("image/jpeg", 0.92);
+  } catch {
+    return url; // CORS yoki boshqa xatoda asl rasmni ko'rsatamiz
+  }
+}
+
+// ---- Asosiy oqim ---------------------------------------------------------
+$("go").addEventListener("click", async () => {
+  $("go").disabled = true;
+  const hash = crypto.randomUUID().replace(/-/g, "");
+  try {
+    setStatus(`<span class="spin">⏳</span> Rasmlar yuklanmoqda…`);
+    const [cb, pb] = await Promise.all([shrink(files.cloth), shrink(files.person)]);
+    const cloth = await upload(cb, "cloth.jpg");
+    const person = await upload(pb, "person.jpg");
+
+    setStatus(`<span class="spin">⏳</span> Navbatga qo'shilmoqda…`);
+    await joinQueue(cloth, person, hash);
+    resultUrl = await waitForResult(hash);
+
+    $("resultImg").src = await withWatermark(resultUrl);
+    $("result").style.display = "block";
+    setStatus("✅ Tayyor!");
+    $("result").scrollIntoView({ behavior: "smooth" });
+    tg.HapticFeedback?.notificationOccurred("success");
+  } catch (e) {
+    const cors = e instanceof TypeError; // "Failed to fetch" odatda CORS yoki tarmoq xatosi
+    setStatus(cors ? "Serverga ulanib bo'lmadi. Internetni tekshirib, qayta urinib ko'ring." : e.message, true);
+    tg.HapticFeedback?.notificationOccurred("error");
+    console.error(e);
+  } finally {
+    $("go").disabled = !(files.cloth && files.person);
+  }
+});
+
+$("send").addEventListener("click", () => {
+  // Bot natijani pechat bilan chatga yuboradi; ilova yopiladi.
+  tg.sendData(JSON.stringify({ url: resultUrl }));
+});
+
+$("again").addEventListener("click", () => {
+  files.cloth = null;
+  $("slotCloth").classList.add("empty");
+  $("slotCloth").querySelector("img")?.remove();
+  $("fileCloth").value = "";
+  $("result").style.display = "none";
+  setStatus("");
+  $("go").disabled = true;
+  window.scrollTo({ top: 0, behavior: "smooth" });
+});
+</script>
+</body>
+</html>
