@@ -13,161 +13,53 @@
     --card: var(--tg-theme-secondary-bg-color, #f2f2f7);
     --btn: var(--tg-theme-button-color, #2481cc);
     --btn-text: var(--tg-theme-button-text-color, #ffffff);
-    --line: rgba(128, 128, 128, .35);
-    --soft: rgba(128, 128, 128, .14);
-    --ok: #2e9e5b;
-    --err: #d93025;
-  }
-  @supports (color: color-mix(in srgb, red, blue)) {
-    :root {
-      --line: color-mix(in srgb, var(--hint) 55%, transparent);
-      --soft: color-mix(in srgb, var(--btn) 12%, transparent);
-    }
   }
   * { box-sizing: border-box; margin: 0; -webkit-tap-highlight-color: transparent; }
-  html { scroll-padding-top: env(safe-area-inset-top, 0px); }
   body {
-    font-family: ui-rounded, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
     background: var(--bg); color: var(--text);
+    padding: 16px 16px calc(24px + env(safe-area-inset-bottom, 0px));
     max-width: 520px; margin: 0 auto;
-    padding: calc(20px + env(safe-area-inset-top, 0px)) 16px calc(96px + env(safe-area-inset-bottom, 0px));
-    -webkit-font-smoothing: antialiased;
   }
-
-  header { margin-bottom: 20px; }
-  h1 { font-size: 26px; line-height: 1.15; font-weight: 750; letter-spacing: -.02em; }
-  p.sub { color: var(--hint); font-size: 15px; line-height: 1.45; margin-top: 6px; max-width: 34ch; }
-
-  /* Ikki slot va ularni bog'lovchi "+" */
-  .pair { position: relative; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-  .join {
-    position: absolute; left: 50%; top: 50%; z-index: 3;
-    width: 32px; height: 32px; margin: -16px 0 0 -16px; border-radius: 50%;
-    background: var(--bg); color: var(--btn); border: 2px solid var(--btn);
-    display: grid; place-items: center; font-size: 20px; font-weight: 600; line-height: 1;
-    pointer-events: none;
-  }
+  h1 { font-size: 20px; font-weight: 650; margin-bottom: 4px; }
+  p.sub { color: var(--hint); font-size: 14px; margin-bottom: 16px; line-height: 1.4; }
+  .slots { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
   .slot {
-    position: relative; aspect-ratio: 3 / 4; border-radius: 22px; overflow: hidden;
-    background: var(--card); cursor: pointer;
-    display: flex; flex-direction: column; align-items: center; justify-content: center;
-    gap: 4px; padding: 16px; text-align: center;
-    outline: 2px dashed var(--line); outline-offset: -2px;
-    transition: transform .15s ease, outline-color .15s ease;
+    position: relative; aspect-ratio: 3 / 4; border-radius: 14px; background: var(--card);
+    overflow: hidden; display: flex; flex-direction: column; align-items: center;
+    justify-content: center; gap: 6px; text-align: center; color: var(--hint);
+    font-size: 14px; cursor: pointer; border: 2px dashed transparent;
   }
-  .slot:active { transform: scale(.97); }
-  .slot:focus-within { outline: 2px solid var(--btn); }
-  .slot input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
-  .slot .ico {
-    width: 64px; height: 64px; border-radius: 50%; margin-bottom: 8px;
-    background: var(--soft); color: var(--btn); display: grid; place-items: center;
-  }
-  .slot .ico svg { width: 34px; height: 34px; }
-  .slot strong { font-size: 17px; font-weight: 700; }
-  .slot .hint { color: var(--hint); font-size: 13px; line-height: 1.35; }
+  .slot.empty { border-color: var(--hint); }
+  .slot strong { color: var(--text); font-size: 15px; }
   .slot img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
-  .slot .tag, .slot .remove { display: none; }
-
-  .slot.filled { outline: none; background: #000; }
-  .slot.filled > .ico, .slot.filled > strong, .slot.filled > .hint { display: none; }
-  .slot.filled::after {
-    content: ""; position: absolute; inset: auto 0 0 0; height: 45%;
-    background: linear-gradient(to top, rgba(0,0,0,.55), transparent); pointer-events: none;
+  .slot input { display: none; }
+  button {
+    width: 100%; margin-top: 16px; padding: 14px; border: 0; border-radius: 12px;
+    background: var(--btn); color: var(--btn-text); font-size: 16px; font-weight: 600; cursor: pointer;
   }
-  .slot.filled .tag {
-    display: block; position: absolute; left: 12px; bottom: 11px; z-index: 2;
-    color: #fff; font-size: 14px; font-weight: 650; text-shadow: 0 1px 4px rgba(0,0,0,.4);
-  }
-  .slot.filled .remove {
-    display: grid; place-items: center; position: absolute; top: 8px; right: 8px; z-index: 2;
-    width: 30px; height: 30px; padding: 0; margin: 0; border-radius: 50%; border: 0;
-    background: rgba(0,0,0,.5); color: #fff; font-size: 16px; line-height: 1;
-    -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
-  }
-
-  .tips {
-    margin-top: 18px; padding: 14px 16px; border-radius: 16px; background: var(--card);
-    font-size: 13.5px; line-height: 1.5; color: var(--hint);
-  }
-  .tips b { color: var(--text); font-weight: 650; }
-  .tips p + p { margin-top: 6px; }
-
-  /* Pastdagi doimiy panel */
-  .dock {
-    position: fixed; left: 0; right: 0; bottom: 0; z-index: 10;
-    padding: 12px 16px calc(14px + env(safe-area-inset-bottom, 0px));
-    background: var(--bg); border-top: 1px solid var(--soft);
-  }
-  .dock-in { max-width: 520px; margin: 0 auto; }
-  #go {
-    width: 100%; padding: 15px; border: 0; border-radius: 14px;
-    background: var(--btn); color: var(--btn-text);
-    font: inherit; font-size: 16px; font-weight: 650; cursor: pointer;
-    transition: transform .12s ease, opacity .2s ease;
-  }
-  #go:active:not(:disabled) { transform: scale(.98); }
-  #go:disabled { opacity: .4; }
-  #go:focus-visible { outline: 3px solid var(--soft); outline-offset: 2px; }
-
-  #status { margin-top: 10px; text-align: center; color: var(--hint); font-size: 14px; line-height: 1.4; }
-  #status:empty { display: none; }
-  #status.err { color: var(--err); }
-  #status.ok { color: var(--ok); font-weight: 600; }
-  .bar { height: 4px; border-radius: 4px; background: var(--soft); overflow: hidden; margin: 0 auto 8px; }
-  .bar i { display: block; height: 100%; width: 40%; border-radius: 4px; background: var(--btn); }
-
+  button:disabled { opacity: .45; }
+  #status { margin-top: 16px; text-align: center; color: var(--hint); font-size: 14px; min-height: 20px; }
+  #status.err { color: #d93025; }
   @media (prefers-reduced-motion: no-preference) {
     .spin { display: inline-block; animation: s 1.2s linear infinite; }
     @keyframes s { to { transform: rotate(360deg); } }
-    .bar i { animation: slide 1.3s ease-in-out infinite; }
-    @keyframes slide { 0% { transform: translateX(-100%); } 100% { transform: translateX(250%); } }
   }
-  @media (max-width: 340px) { h1 { font-size: 22px; } .slot .ico { width: 52px; height: 52px; } }
 </style>
 </head>
 <body>
-  <header>
-    <h1>Virtual kiyim kiyish</h1>
-    <p class="sub">Kiyim va o'zingizning rasmingizni tanlang. Natija tayyor bo'lgach chatga keladi.</p>
-  </header>
+  <h1>Virtual kiyim kiyish</h1>
+  <p class="sub">Kiyim va o'zingizning rasmingizni tanlang, yuboring, natija tayyor bo'lgach chatga keladi.</p>
 
-  <div class="pair">
-    <label class="slot" id="slotCloth">
-      <span class="ico">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 7.5a2.2 2.2 0 1 0-2.2-2.2"/><path d="M12 7.5v1.6L3.6 15a1.6 1.6 0 0 0 1 2.9h14.8a1.6 1.6 0 0 0 1-2.9L12 9.1"/></svg>
-      </span>
-      <strong>Kiyim</strong>
-      <span class="hint">Tekis, aniq rasm</span>
-      <span class="tag">Kiyim</span>
-      <button type="button" class="remove" id="rmCloth" aria-label="Kiyim rasmini olib tashlash">✕</button>
-      <input type="file" accept="image/*" id="fileCloth">
-    </label>
-
-    <span class="join" aria-hidden="true">+</span>
-
-    <label class="slot" id="slotPerson">
-      <span class="ico">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="7.5" r="3.6"/><path d="M5 20.5c.6-4 3.2-6.3 7-6.3s6.4 2.3 7 6.3"/></svg>
-      </span>
-      <strong>Siz</strong>
-      <span class="hint">Butun bo'y, old tomondan</span>
-      <span class="tag">Siz</span>
-      <button type="button" class="remove" id="rmPerson" aria-label="Sizning rasmingizni olib tashlash">✕</button>
-      <input type="file" accept="image/*" id="filePerson">
-    </label>
+  <div class="slots">
+    <label class="slot empty" id="slotCloth"><strong>Kiyim</strong><span>Rasm tanlash</span>
+      <input type="file" accept="image/*" id="fileCloth"></label>
+    <label class="slot empty" id="slotPerson"><strong>Siz</strong><span>Rasm tanlash</span>
+      <input type="file" accept="image/*" id="filePerson"></label>
   </div>
 
-  <div class="tips">
-    <p><b>Kiyim:</b> fon oddiy, kiyim to'liq ko'rinib tursin.</p>
-    <p><b>Siz:</b> yorug'likda, to'g'ri turgan holatdagi rasm yaxshi natija beradi.</p>
-  </div>
-
-  <div class="dock">
-    <div class="dock-in">
-      <button id="go" disabled>Yuborish</button>
-      <div id="status" role="status" aria-live="polite"></div>
-    </div>
-  </div>
+  <button id="go" disabled>Yuborish</button>
+  <div id="status"></div>
 
 <script>
 // ---- Sozlamalar -----------------------------------------------------------
@@ -194,44 +86,37 @@ async function req(url, opts) {
 // ---- Rasm tanlash ---------------------------------------------------------
 function setSlot(key, file) {
   const slot = $(key === "cloth" ? "slotCloth" : "slotPerson");
-  const old = slot.querySelector("img");
-  if (old) { URL.revokeObjectURL(old.src); old.remove(); }
+  slot.querySelector("img")?.remove();
   files[key] = file;
   if (file) {
-    slot.classList.add("filled");
+    slot.classList.remove("empty");
     const img = document.createElement("img");
-    img.alt = key === "cloth" ? "Tanlangan kiyim" : "Sizning rasmingiz";
     img.src = URL.createObjectURL(file);
-    slot.prepend(img);
+    slot.appendChild(img);
   } else {
-    slot.classList.remove("filled");
-    $(key === "cloth" ? "fileCloth" : "filePerson").value = "";
+    slot.classList.add("empty");
   }
   $("go").disabled = !(files.cloth && files.person);
 }
-function bindSlot(key, inputId, removeId) {
+function bindSlot(key, inputId) {
   $(inputId).addEventListener("change", (e) => {
     const f = e.target.files[0];
-    if (f) { setSlot(key, f); tg.HapticFeedback?.selectionChanged(); }
-  });
-  $(removeId).addEventListener("click", (e) => {
-    e.preventDefault(); e.stopPropagation();   // fayl oynasi ochilmasin
-    setSlot(key, null);
+    if (f) setSlot(key, f);
   });
 }
-bindSlot("cloth", "fileCloth", "rmCloth");
-bindSlot("person", "filePerson", "rmPerson");
+bindSlot("cloth", "fileCloth");
+bindSlot("person", "filePerson");
 
 // ---- Yordamchi funksiyalar -----------------------------------------------
 let tick = null, t0 = 0, baseText = "";
 function render() {
   const sec = Math.round((Date.now() - t0) / 1000);
-  $("status").innerHTML = `<div class="bar"><i></i></div>${baseText} <small>· ${sec} soniya</small>`;
+  $("status").innerHTML = `${baseText} <small>· ${sec} soniya</small>`;
 }
-function setStatus(text, kind = "") {   // kind: "", "ok", "err"
+function setStatus(text, isError = false) {
   clearInterval(tick); tick = null;
   const el = $("status");
-  el.className = kind;
+  el.className = isError ? "err" : "";
   el.innerHTML = text;
 }
 function setProgress(text) {   // vaqt hisoblagichli holat
@@ -314,7 +199,7 @@ $("go").addEventListener("click", async () => {
     setProgress(`<span class="spin">⏳</span> Navbatga qo'shilmoqda…`);
     await joinQueue(cloth, person, hash);
 
-    setStatus("✅ Yuborildi! Natija chatga keladi.", "ok");
+    setStatus("✅ Yuborildi! Natija chatga keladi.");
     tg.HapticFeedback?.notificationOccurred("success");
     sent = true;
     // Mini App yopiladi, natijani bot o'zi kutib olib chatga yuboradi
@@ -323,7 +208,7 @@ $("go").addEventListener("click", async () => {
     const msg = e instanceof NetError
       ? "Serverga ulanib bo'lmadi. Internetni tekshirib, qayta urinib ko'ring."
       : e.message;
-    setStatus(msg, "err");
+    setStatus(msg, true);
     tg.HapticFeedback?.notificationOccurred("error");
     console.error(e);
   } finally {
